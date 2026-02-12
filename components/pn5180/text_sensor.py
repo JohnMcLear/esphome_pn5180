@@ -7,10 +7,6 @@ from esphome.const import CONF_ID
 pn5180_ns = cg.esphome_ns.namespace("pn5180")
 PN5180Component = pn5180_ns.class_("PN5180Component", cg.PollingComponent, text_sensor.TextSensor)
 
-var = cg.new_Pvariable(config[CONF_ID])
-await cg.register_component(var, config)
-await text_sensor.register_text_sensor(var, config)
-
 
 CONF_PN5180 = "pn5180"
 
@@ -25,6 +21,9 @@ CONFIG_SCHEMA = text_sensor.text_sensor_schema(PN5180Component).extend(
 )
 
 async def to_code(config):
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    await text_sensor.register_text_sensor(var, config)
     cs = await cg.gpio_pin_expression(config["cs_pin"])
     busy = await cg.gpio_pin_expression(config["busy_pin"])
     rst = await cg.gpio_pin_expression(config["rst_pin"])
