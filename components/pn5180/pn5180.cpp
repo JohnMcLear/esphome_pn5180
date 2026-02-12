@@ -1,5 +1,11 @@
 #include "pn5180.h"
 
+namespace esphome {
+namespace pn5180 {
+
+PN5180Component::PN5180Component(GPIOPin *cs, GPIOPin *busy, GPIOPin *rst, uint32_t update_interval)
+    : PollingComponent(update_interval), cs_(cs), busy_(busy), rst_(rst) {}
+
 void PN5180Component::setup() {
   cs_pin_->setup();
   busy_pin_->setup();
@@ -36,3 +42,7 @@ void PN5180Component::update() {
     default_state = true;
   }
 }
+
+}  // namespace pn5180
+}  // namespace esphome
+
