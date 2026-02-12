@@ -1,5 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome import pins
 from esphome.components import text_sensor
 from esphome.const import CONF_ID
 
@@ -11,9 +12,9 @@ CONF_PN5180 = "pn5180"
 CONFIG_SCHEMA = text_sensor.text_sensor_schema(PN5180Component).extend(
     {
         cv.GenerateID(): cv.declare_id(PN5180Component),
-        cv.Required("cs_pin"): cv.gpio_output_pin_schema,
-        cv.Required("busy_pin"): cv.gpio_input_pin_schema,
-        cv.Required("rst_pin"): cv.gpio_output_pin_schema,
+        cv.Required("cs_pin"): pins.gpio_output_pin_schema,
+        cv.Required("busy_pin"): pins.gpio_input_pin_schema,
+        cv.Required("rst_pin"): pins.gpio_output_pin_schema,
         cv.Optional("update_interval", default="500ms"): cv.update_interval,
     }
 )
