@@ -11,24 +11,22 @@ https://github.com/esphome/feature-requests/issues/1972#issuecomment-1493112460
 external_components:
   - source:
       type: git
-      url: https://github.com/johnmclear/pn5180
+      url: https://github.com/johnmclear/esphome_pn5180
 
 esphome:
-  name: fancyname
-  platform: ESP32
-  board: esp32dev
   libraries:
     - SPI
-    - https://github.com/ATrappmann/PN5180-Library.git#master
+    - PN5180_LIBRARY=https://github.com/ATrappmann/PN5180-Library.git#master
 ```
 
 ```
+pn5180:
+  cs_pin: 16
+  busy_pin: 5
+  rst_pin: 17
+  update_interval: 500ms
+
 text_sensor:
-  - platform: custom
-    lambda: |-
-      auto pn5180_component = new PN5180Component(16, 5, 17, 500); // PIN ss, busy, rst and poll interval (every 500ms)
-      App.register_component(pn5180_component);
-      return {pn5180_component};
-    text_sensors:
-      name: "NFC tag scanner"
+  - platform: pn5180
+    name: "NFC tag scanner"
 ```
