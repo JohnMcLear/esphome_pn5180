@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome import text_sensor
+from esphome.components import text_sensor
 from esphome.const import CONF_ID
 
 pn5180_ns = cg.esphome_ns
