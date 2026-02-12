@@ -4,8 +4,13 @@ from esphome import pins
 from esphome.components import text_sensor
 from esphome.const import CONF_ID
 
-pn5180_ns = cg.esphome_ns
+pn5180_ns = cg.esphome_ns.namespace("pn5180")
 PN5180Component = pn5180_ns.class_("PN5180Component", cg.PollingComponent, text_sensor.TextSensor)
+
+var = cg.new_Pvariable(config[CONF_ID])
+await cg.register_component(var, config)
+await text_sensor.register_text_sensor(var, config)
+
 
 CONF_PN5180 = "pn5180"
 

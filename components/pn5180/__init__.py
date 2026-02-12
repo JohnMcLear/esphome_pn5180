@@ -2,7 +2,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
 from esphome.const import CONF_ID
-
+AUTO_LOAD = ["spi"]
 pn5180_ns = cg.esphome_ns
 PN5180Component = pn5180_ns.class_("PN5180Component", cg.PollingComponent)
 
