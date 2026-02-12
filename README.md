@@ -1,6 +1,8 @@
 # esphome_pn5180
 pn5180 component for ESPHome
 
+Exposes a scanned tags UID to Home Assistant - that's all, for now.
+
 Referenced from 
 
 https://github.com/esphome/feature-requests/issues/1972#issuecomment-1493112460
@@ -20,13 +22,11 @@ esphome:
 ```
 
 ```
-pn5180:
-  cs_pin: 16
-  busy_pin: 5
-  rst_pin: 17
-  update_interval: 500ms
-
 text_sensor:
   - platform: pn5180
     name: "NFC tag scanner"
+    cs_pin: 16
+    busy_pin: 5
+    rst_pin: 17
+    update_interval: 500ms
 ```
