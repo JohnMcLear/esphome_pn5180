@@ -3,7 +3,7 @@ import esphome.config_validation as cv
 from esphome import text_sensor
 from esphome.const import CONF_ID
 
-pn5180_ns = cg.esphome_ns.namespace("pn5180")
+pn5180_ns = cg.esphome_ns
 PN5180Component = pn5180_ns.class_("PN5180Component", cg.PollingComponent, text_sensor.TextSensor)
 
 CONF_PN5180 = "pn5180"
