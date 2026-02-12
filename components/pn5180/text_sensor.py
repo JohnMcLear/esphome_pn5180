@@ -24,9 +24,9 @@ CONFIG_SCHEMA = text_sensor.text_sensor_schema(PN5180Component).extend(
 )
 
 async def to_code(config):
-    cs = await pins.gpio_pin_expression(config[CONF_CS_PIN])
-    busy = await pins.gpio_pin_expression(config[CONF_BUSY_PIN])
-    rst = await pins.gpio_pin_expression(config[CONF_RST_PIN])
+    cs = await cg.gpio_pin_expression(config[CONF_CS_PIN])
+    busy = await cg.gpio_pin_expression(config[CONF_BUSY_PIN])
+    rst = await cg.gpio_pin_expression(config[CONF_RST_PIN])
 
     var = cg.new_Pvariable(
         config[CONF_ID],
