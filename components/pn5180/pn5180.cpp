@@ -18,17 +18,24 @@ void PN5180Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up PN5180...");
   
   // Setup pins
-  this->busy_pin_->setup();
-  this->rst_pin_->setup();
+  if (this->busy_pin_ != nullptr) {
+    this->busy_pin_->setup();
+  }
+  if (this->rst_pin_ != nullptr) {
+    this->rst_pin_->setup();
+  }
   
-  // Get CS pin from SPI device
+  // Initialize SPI
+  this->spi_setup();
+  
+  // Get pin numbers
   uint8_t cs_pin = this->cs_->get_pin();
-  uint8_t busy_pin = this->busy_pin_->get_pin();
-  uint8_t rst_pin = this->rst_pin_->get_pin();
+  uint8_t busy_pin = this->busy_pin_ ? this->busy_pin_->get_pin() : 255;
+  uint8_t rst_pin = this->rst_pin_ ? this->rst_pin_->get_pin() : 255;
   
-  ESP_LOGCONFIG(TAG, "  CS Pin: %d", cs_pin);
-  ESP_LOGCONFIG(TAG, "  BUSY Pin: %d", busy_pin);
-  ESP_LOGCONFIG(TAG, "  RST Pin: %d", rst_pin);
+  ESP_LOGCONFIG(TAG, "  CS Pin: GPIO%d", cs_pin);
+  ESP_LOGCONFIG(TAG, "  BUSY Pin: GPIO%d", busy_pin);
+  ESP_LOGCONFIG(TAG, "  RST Pin: GPIO%d", rst_pin);
 
   // Create PN5180 object
   this->pn5180_ = new PN5180ISO15693(cs_pin, busy_pin, rst_pin);
