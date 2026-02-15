@@ -12,19 +12,27 @@ external_components:
   - source:
       type: git
       url: https://github.com/johnmclear/esphome_pn5180
+      ref: claude
 
 esphome:
   libraries:
     - SPI
     - PN5180_LIBRARY=https://github.com/ATrappmann/PN5180-Library.git#master
 
-text_sensor:
-  - platform: pn5180
-    name: "NFC tag scanner"
-    cs_pin: 16
-    busy_pin: 5
-    rst_pin: 17
-    update_interval: 500ms
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+pn5180:
+  cs_pin: GPIO16
+  busy_pin: GPIO5
+  rst_pin: GPIO17
+  on_tag:
+    then:
+      - logger.log:
+          format: "Tag: %s"
+          args: ['tag_id.c_str()']
 ```
 
 # Full ESPHome example
@@ -47,18 +55,19 @@ external_components:
       type: git
       url: https://github.com/johnmclear/esphome_pn5180
 
-text_sensor:
-  - platform: pn5180
-    name: "NFC tag scanner"
-    cs_pin: 16
-    busy_pin: 5
-    rst_pin: 17
-    update_interval: 500ms
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+pn5180:
+  cs_pin: GPIO16
+  busy_pin: GPIO5
+  rst_pin: GPIO17
+  on_tag:
+    then:
+      - logger.log:
+          format: "Tag: %s"
+          args: ['tag_id.c_str()']
 ```
 
-# Todo
-
- - [ ] Support the on_tag syntax
- - [ ] Refactor all .h and .cpp reducing cruft
- - [ ] Test coverage w/ ~wokwi
- - [ ] Unit test coverage
