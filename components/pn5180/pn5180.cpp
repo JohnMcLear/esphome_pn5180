@@ -29,7 +29,7 @@ void PN5180Component::setup() {
   }
   
   // Get pin numbers
-  uint8_t cs_pin = this->cs_->get_pin();
+  uint8_t cs_pin = ((InternalGPIOPin *)this->cs_)->get_pin();
   uint8_t busy_pin = this->busy_pin_ ? this->busy_pin_->get_pin() : 255;
   uint8_t rst_pin = this->rst_pin_ ? this->rst_pin_->get_pin() : 255;
   
