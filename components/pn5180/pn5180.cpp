@@ -6,40 +6,51 @@ namespace pn5180 {
 
 static const char *const TAG = "pn5180";
 
-// PN5180TagTrigger implementation
-PN5180TagTrigger::PN5180TagTrigger(PN5180Component *parent) {
+// PN5180Trigger implementation
+PN5180Trigger::PN5180Trigger(PN5180Component *parent) {
   parent->add_on_tag_callback([this](const std::string &tag_id) { 
     this->trigger(tag_id); 
   });
 }
 
 // PN5180Component implementation
-PN5180Component::PN5180Component(InternalGPIOPin *cs, InternalGPIOPin *busy,
-                                 InternalGPIOPin *rst, uint32_t update_interval)
-    : PollingComponent(update_interval), cs_(cs), busy_(busy), rst_(rst) {}
-
-PN5180Component::~PN5180Component() {
-  delete this->pn5180_;
-}
-
 void PN5180Component::setup() {
-  ESP_LOGI(TAG, "Initializing PN5180 on pins CS=%d, BUSY=%d, RST=%d",
-           this->cs_->get_pin(), this->busy_->get_pin(), this->rst_->get_pin());
+  ESP_LOGCONFIG(TAG, "Setting up PN5180...");
+  
+  // Setup pins
+  this->busy_pin_->setup();
+  this->rst_pin_->setup();
+  
+  // Get CS pin from SPI device
+  uint8_t cs_pin = this->cs_->get_pin();
+  uint8_t busy_pin = this->busy_pin_->get_pin();
+  uint8_t rst_pin = this->rst_pin_->get_pin();
+  
+  ESP_LOGCONFIG(TAG, "  CS Pin: %d", cs_pin);
+  ESP_LOGCONFIG(TAG, "  BUSY Pin: %d", busy_pin);
+  ESP_LOGCONFIG(TAG, "  RST Pin: %d", rst_pin);
 
-  this->pn5180_ = new PN5180ISO15693(this->cs_->get_pin(), 
-                                      this->busy_->get_pin(),
-                                      this->rst_->get_pin());
+  // Create PN5180 object
+  this->pn5180_ = new PN5180ISO15693(cs_pin, busy_pin, rst_pin);
 
+  // Initialize hardware
   this->pn5180_->begin();
   this->pn5180_->reset();
   this->pn5180_->setupRF();
   
-  ESP_LOGI(TAG, "PN5180 initialized successfully");
+  ESP_LOGCONFIG(TAG, "PN5180 setup complete");
+}
+
+void PN5180Component::dump_config() {
+  ESP_LOGCONFIG(TAG, "PN5180:");
+  LOG_PIN("  BUSY Pin: ", this->busy_pin_);
+  LOG_PIN("  RST Pin: ", this->rst_pin_);
+  LOG_UPDATE_INTERVAL(this);
 }
 
 void PN5180Component::update() {
   if (this->pn5180_ == nullptr) {
-    ESP_LOGW(TAG, "PN5180 not initialized, skipping update");
+    ESP_LOGW(TAG, "PN5180 not initialized");
     return;
   }
 
@@ -58,9 +69,6 @@ void PN5180Component::update() {
     std::string tag_id(buffer);
     ESP_LOGI(TAG, "Tag detected: %s", tag_id.c_str());
     
-    // Publish state
-    this->publish_state(tag_id);
-    
     // Fire callbacks only on tag change
     if (tag_id != this->last_tag_id_) {
       this->on_tag_callbacks_.call(tag_id);
@@ -72,7 +80,6 @@ void PN5180Component::update() {
     // No tag or error
     if (!this->no_tag_reported_) {
       ESP_LOGD(TAG, "No tag detected");
-      this->publish_state("");
       this->last_tag_id_ = "";
       this->no_tag_reported_ = true;
     }
