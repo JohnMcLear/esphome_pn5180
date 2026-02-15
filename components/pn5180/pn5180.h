@@ -24,8 +24,11 @@ class PN5180Trigger : public Trigger<std::string> {
 };
 
 /// Main PN5180 component for reading NFC/RFID tags
-class PN5180Component : public PollingComponent, 
-                        public spi::SPIDevice<> {
+class PN5180Component : public PollingComponent,
+                        public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST,
+                                             spi::CLOCK_POLARITY_LOW,
+                                             spi::CLOCK_PHASE_LEADING,
+                                             spi::DATA_RATE_1MHZ> {
  public:
   void setup() override;
   void update() override;

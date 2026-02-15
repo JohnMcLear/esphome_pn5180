@@ -17,6 +17,9 @@ PN5180Trigger::PN5180Trigger(PN5180Component *parent) {
 void PN5180Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up PN5180...");
   
+  // Setup SPI
+  this->spi_setup();
+  
   // Setup pins
   if (this->busy_pin_ != nullptr) {
     this->busy_pin_->setup();
@@ -24,9 +27,6 @@ void PN5180Component::setup() {
   if (this->rst_pin_ != nullptr) {
     this->rst_pin_->setup();
   }
-  
-  // Initialize SPI
-  this->spi_setup();
   
   // Get pin numbers
   uint8_t cs_pin = this->cs_->get_pin();
