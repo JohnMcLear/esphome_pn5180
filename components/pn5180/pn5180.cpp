@@ -150,36 +150,23 @@ bool PN5180Component::perform_health_check() {
   
   // Attempt to read the product version register
   // This is a non-intrusive way to verify SPI communication
-  uint8_t version[2];
   
-  // Try to get the version - this verifies SPI communication
-  // Note: This depends on the PN5180 library having a getVersion() method
-  // If not available, we can try a simple register read
-  
-  // For now, we'll use a simple SPI communication test
-  // by attempting to initialize RF (which should be safe and quick)
-  try {
-    // A simple test: ensure the busy pin is not stuck
-    if (this->busy_pin_ != nullptr) {
-      // If BUSY is stuck high, something is wrong
+  // A simple test: ensure the busy pin is not stuck
+  if (this->busy_pin_ != nullptr) {
+    // If BUSY is stuck high, something is wrong
+    if (this->busy_pin_->digital_read()) {
+      // Wait a bit and check again
+      delay(10);
       if (this->busy_pin_->digital_read()) {
-        // Wait a bit and check again
-        delay(10);
-        if (this->busy_pin_->digital_read()) {
-          ESP_LOGD(TAG, "Health check: BUSY pin stuck high");
-          return false;
-        }
+        ESP_LOGD(TAG, "Health check: BUSY pin stuck high");
+        return false;
       }
     }
-    
-    // If we got here, basic communication seems OK
-    ESP_LOGV(TAG, "Health check passed");
-    return true;
-    
-  } catch (...) {
-    ESP_LOGW(TAG, "Health check exception");
-    return false;
   }
+  
+  // If we got here, basic communication seems OK
+  ESP_LOGV(TAG, "Health check passed");
+  return true;
 }
 
 void PN5180Component::update() {
