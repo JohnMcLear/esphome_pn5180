@@ -261,6 +261,7 @@ pn5180:
 - [ ] Create a test method that periodically (lets say every 60 seconds but should be adjustable through esphome YAML) sends a command to the pn5180 to check its availability and functionality - I imagine the NXP PN5180 spec docs explain what command to send and expect to recieve.  If this fails then allow esphome to know NFC has failed.  Perhaps from this send a RST command to reboot the PN5180.
 - [x] Ensure update_interval is a usable and working yaml config change as per pn532 docs
 - [ ] Consider different librarys as ATrappmann/PN5180-Library.git seems neglected.  https://github.com/mjmeans/PN5180-Library and https://github.com/playfultechnology/PN5180 for example
+- [ ] Check if RF field can be adjusted through ESPHome
 
 ## Contributing
 
