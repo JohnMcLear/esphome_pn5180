@@ -2,14 +2,19 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins, automation
-from esphome.components import spi
-from esphome.const import CONF_ID, CONF_TRIGGER_ID
+from esphome.components import spi, binary_sensor
+from esphome.const import (
+    CONF_ID,
+    CONF_TRIGGER_ID,
+    DEVICE_CLASS_CONNECTIVITY,
+)
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
 # Dependencies
 DEPENDENCIES = ["spi"]
+AUTO_LOAD = ["binary_sensor"]
 
 # Namespace
 pn5180_ns = cg.esphome_ns.namespace("pn5180")
@@ -27,12 +32,20 @@ CONF_BUSY_PIN = "busy_pin"
 CONF_RST_PIN = "rst_pin"
 CONF_ON_TAG = "on_tag"
 CONF_UPDATE_INTERVAL = "update_interval"
+CONF_HEALTH_CHECK_ENABLED = "health_check_enabled"
+CONF_HEALTH_CHECK_INTERVAL = "health_check_interval"
+CONF_AUTO_RESET_ON_FAILURE = "auto_reset_on_failure"
+CONF_MAX_FAILED_CHECKS = "max_failed_checks"
 
 # Recommended timing based on PN532 and hardware limitations
 MIN_UPDATE_INTERVAL = cv.TimePeriod(milliseconds=200)
 MAX_UPDATE_INTERVAL = cv.TimePeriod(seconds=10)
 DEFAULT_UPDATE_INTERVAL = "500ms"
 RECOMMENDED_MIN_INTERVAL = cv.TimePeriod(milliseconds=250)
+
+# Health check defaults
+DEFAULT_HEALTH_CHECK_INTERVAL = "60s"
+DEFAULT_MAX_FAILED_CHECKS = 3
 
 
 def validate_update_interval(value):
@@ -64,6 +77,15 @@ CONFIG_SCHEMA = (
                 cv.Range(min=MIN_UPDATE_INTERVAL, max=MAX_UPDATE_INTERVAL),
                 validate_update_interval,
             ),
+            # Health check options
+            cv.Optional(CONF_HEALTH_CHECK_ENABLED, default=True): cv.boolean,
+            cv.Optional(
+                CONF_HEALTH_CHECK_INTERVAL, default=DEFAULT_HEALTH_CHECK_INTERVAL
+            ): cv.positive_time_period,
+            cv.Optional(CONF_AUTO_RESET_ON_FAILURE, default=True): cv.boolean,
+            cv.Optional(
+                CONF_MAX_FAILED_CHECKS, default=DEFAULT_MAX_FAILED_CHECKS
+            ): cv.int_range(min=1, max=10),
         }
     )
     .extend(cv.polling_component_schema(DEFAULT_UPDATE_INTERVAL))
@@ -82,6 +104,16 @@ async def to_code(config):
 
     rst = await cg.gpio_pin_expression(config[CONF_RST_PIN])
     cg.add(var.set_rst_pin(rst))
+
+    # Health check configuration
+    cg.add(var.set_health_check_enabled(config[CONF_HEALTH_CHECK_ENABLED]))
+    cg.add(
+        var.set_health_check_interval(
+            config[CONF_HEALTH_CHECK_INTERVAL].total_milliseconds
+        )
+    )
+    cg.add(var.set_auto_reset_on_failure(config[CONF_AUTO_RESET_ON_FAILURE]))
+    cg.add(var.set_max_failed_checks(config[CONF_MAX_FAILED_CHECKS]))
 
     for conf in config.get(CONF_ON_TAG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
