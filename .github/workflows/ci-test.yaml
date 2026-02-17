@@ -1,0 +1,70 @@
+esphome:
+  name: pn5180-ci-test
+  libraries:
+    - SPI
+    - PN5180_LIBRARY=https://github.com/ATrappmann/PN5180-Library.git#master
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+# CI doesn't upload, so api/ota/wifi use dummy values from secrets.yaml
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# Point to the local component in this repo
+external_components:
+  - source:
+      type: local
+      path: components
+    refresh: 0s
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+# ── Main component ─────────────────────────────────────────────────────────────
+pn5180:
+  cs_pin: GPIO16
+  busy_pin: GPIO5
+  rst_pin: GPIO17
+  update_interval: 500ms
+  health_check_enabled: true
+  health_check_interval: 60s
+  max_failed_checks: 3
+  auto_reset_on_failure: true
+  on_tag:
+    then:
+      - logger.log:
+          format: "Tag: %s"
+          args: ['tag_id.c_str()']
+      - homeassistant.tag_scanned: !lambda 'return tag_id;'
+  on_tag_removed:
+    then:
+      - logger.log:
+          format: "Tag removed: %s"
+          args: ['tag_id.c_str()']
+
+# ── Binary sensors ─────────────────────────────────────────────────────────────
+binary_sensor:
+  - platform: pn5180
+    name: "Test Badge"
+    uid: "E0 07 01 23 45 67 89 AB"
+
+# ── Text sensor ────────────────────────────────────────────────────────────────
+text_sensor:
+  - platform: pn5180
+    name: "Last NFC Tag"
