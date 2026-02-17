@@ -29,12 +29,26 @@ jobs:
           restore-keys: |
             esphome-${{ runner.os }}-
 
+      - name: Fix cache permissions (Docker runs as root)
+        run: |
+          sudo chown -R $USER:$USER .esphome ~/.platformio 2>/dev/null || true
+
       - name: Compile PN5180 firmware
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/config \
             ghcr.io/esphome/esphome:latest \
             compile ci-test.yaml
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::error::ESPHome compilation failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Fix permissions before cache save
+        if: always()
+        run: |
+          sudo chown -R $USER:$USER .esphome ~/.platformio 2>/dev/null || true
 
       - name: Upload build artifacts
         if: success()
