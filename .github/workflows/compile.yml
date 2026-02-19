@@ -2,59 +2,42 @@ name: ESPHome Compile
 
 on:
   push:
-    branches:
-      - main
-      - claude
+    branches: [main, dev]
   pull_request:
-    branches:
-      - main
-      - claude
+    branches: [main]
 
 jobs:
   compile:
-    name: Compile ESPHome firmware
+    name: Compile PN5180 Enhanced
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - example-simple.yaml
+          - example-full-features.yaml
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache ESPHome build files
+      - name: Cache
         uses: actions/cache@v4
         with:
           path: |
             .esphome
             ~/.platformio
-          key: esphome-${{ runner.os }}-${{ hashFiles('ci-test.yaml', 'components/**') }}
-          restore-keys: |
-            esphome-${{ runner.os }}-
+          key: esphome-${{ matrix.config }}
 
-      - name: Fix cache permissions (Docker runs as root)
-        run: |
-          sudo chown -R $USER:$USER .esphome ~/.platformio 2>/dev/null || true
-
-      - name: Compile PN5180 firmware
+      - name: Compile
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/config \
             ghcr.io/esphome/esphome:latest \
-            compile ci-test.yaml
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "::error::ESPHome compilation failed with exit code $EXIT_CODE"
-            exit $EXIT_CODE
-          fi
+            compile "${{ matrix.config }}"
 
-      - name: Fix permissions before cache save
-        if: always()
-        run: |
-          sudo chown -R $USER:$USER .esphome ~/.platformio 2>/dev/null || true
-
-      - name: Upload build artifacts
+      - name: Upload firmware
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: .esphome/build/pn5180-ci-test/.pioenvs/pn5180-ci-test/firmware.bin
-          if-no-files-found: ignore
-          retention-days: 7
+          name: firmware-${{ matrix.config }}
+          path: .esphome/build/*/firmware.bin

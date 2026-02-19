@@ -1,0 +1,55 @@
+esphome:
+  name: pn532-spi-ci-test
+  friendly_name: PN532 SPI CI Test
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: "CI_DUMMY_SSID"
+  password: "CI_DUMMY_PASSWORD"
+
+external_components:
+  - source:
+      type: local
+      path: components
+    # Explicitly list all three components so ESPHome overrides the built-in
+    # pn532 package entirely (including binary_sensor.py submodule).
+    components: [pn532, pn532_spi, pn532_i2c]
+    refresh: 0s
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+pn532_spi:
+  id: pn532_board
+  cs_pin: GPIO5
+  update_interval: 1s
+  health_check_enabled: true
+  health_check_interval: 60s
+  max_failed_checks: 3
+  auto_reset_on_failure: true
+  rf_field_enabled: false
+  on_tag:
+    then:
+      - logger.log:
+          format: "Tag scanned: %s"
+          args: ['x.c_str()']
+  on_tag_removed:
+    then:
+      - logger.log:
+          format: "Tag removed: %s"
+          args: ['x.c_str()']
+
+binary_sensor:
+  - platform: pn532
+    pn532_id: pn532_board
+    name: "Test Badge SPI"
+    uid: "74-10-37-94"

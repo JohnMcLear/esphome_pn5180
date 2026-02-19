@@ -1,0 +1,48 @@
+# ESPHome PN5180 Enhanced - Simple Example
+# Basic config with just the power optimizations
+
+esphome:
+  name: pn5180-simple
+  friendly_name: PN5180 Simple
+
+esp32:
+  board: esp32dev
+
+logger:
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+api:
+ota:
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/YOUR_USERNAME/esphome-pn5180-enhanced
+    components: [pn5180]
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+pn5180:
+  id: nfc
+  cs_pin: GPIO5
+  rst_pin: GPIO17
+  busy_pin: GPIO16
+  
+  # Maximize RF power for long range
+  rf_power_level: 255
+  rf_protocol_priority: ISO15693
+  
+  on_tag:
+    - homeassistant.tag_scanned: !lambda 'return x;'
+
+binary_sensor:
+  - platform: pn5180
+    name: "My Badge"
+    uid: "E0-04-01-50-4D-8A-3C-5F"
