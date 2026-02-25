@@ -1,8 +1,5 @@
 esphome:
   name: pn5180-ci-test
-  libraries:
-    - SPI
-    - PN5180_LIBRARY=https://github.com/ATrappmann/PN5180-Library.git#master
 
 esp32:
   board: esp32dev

@@ -121,6 +121,14 @@ async def to_code(config):
     await cg.register_component(var, config)
     await spi.register_spi_device(var, config)
 
+    # Auto-pull required libraries — no need to specify in user YAML
+    cg.add_library("SPI", None)
+    cg.add_library("PN5180_LIBRARY", None, "https://github.com/tueddy/PN5180-Library.git#master")
+
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    await spi.register_spi_device(var, config)
+
     busy = await cg.gpio_pin_expression(config[CONF_BUSY_PIN])
     cg.add(var.set_busy_pin(busy))
 
