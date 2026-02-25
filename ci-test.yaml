@@ -22,7 +22,7 @@ external_components:
 spi:
   clk_pin: GPIO18
   miso_pin: GPIO19
-  mosi_pin: GPIO23
+  mosi_pin: GPIO15
 
 pn5180:
   cs_pin: GPIO16

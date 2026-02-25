@@ -4,132 +4,120 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/automation.h"
 #include "esphome/components/spi/spi.h"
-#include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/text_sensor/text_sensor.h"
-#include <PN5180ISO15693.h>
-#include <string>
 #include <vector>
+#include <map>
 
 namespace esphome {
 namespace pn5180 {
 
-static constexpr uint8_t UID_SIZE = 8;
-static constexpr size_t UID_BUFFER_SIZE = 32;
+// PN5180 Command Codes
+static const uint8_t PN5180_CMD_WRITE_REGISTER = 0x00;
+static const uint8_t PN5180_CMD_WRITE_REGISTER_OR_MASK = 0x01;
+static const uint8_t PN5180_CMD_WRITE_REGISTER_AND_MASK = 0x02;
+static const uint8_t PN5180_CMD_READ_REGISTER = 0x04;
+static const uint8_t PN5180_CMD_READ_EEPROM = 0x07;
+static const uint8_t PN5180_CMD_SEND_DATA = 0x09;
+static const uint8_t PN5180_CMD_READ_DATA = 0x0A;
+static const uint8_t PN5180_CMD_LOAD_RF_CONFIG = 0x11;
+static const uint8_t PN5180_CMD_RF_ON = 0x16;
+static const uint8_t PN5180_CMD_RF_OFF = 0x17;
 
-class PN5180Component;
+// PN5180 Registers
+static const uint32_t PN5180_REG_SYSTEM_CONFIG = 0x00;
+static const uint32_t PN5180_REG_IRQ_ENABLE = 0x01;
+static const uint32_t PN5180_REG_IRQ_STATUS = 0x02;
+static const uint32_t PN5180_REG_IRQ_CLEAR = 0x03;
+static const uint32_t PN5180_REG_TRANSCEIVE_CONTROL = 0x04;
+static const uint32_t PN5180_REG_TIMER1_RELOAD = 0x0C;
+static const uint32_t PN5180_REG_TIMER1_CONFIG = 0x0F;
+static const uint32_t PN5180_REG_RX_STATUS = 0x13;
+static const uint32_t PN5180_REG_RF_STATUS = 0x1D;
 
-// ─── Triggers ────────────────────────────────────────────────────────────────
+// RF Protocols
+static const uint8_t PN5180_PROTOCOL_ISO15693 = 0x01;
+static const uint8_t PN5180_PROTOCOL_ISO14443A = 0x00;
 
-/// Fires when a new tag is detected (tag_id passed to automation)
-class PN5180TagTrigger : public Trigger<std::string> {
- public:
-  explicit PN5180TagTrigger(PN5180Component *parent);
-};
+// IRQ Status Bits
+static const uint32_t PN5180_IRQ_RX_SOF = (1 << 0);
+static const uint32_t PN5180_IRQ_RX = (1 << 1);
+static const uint32_t PN5180_IRQ_TX = (1 << 2);
+static const uint32_t PN5180_IRQ_IDLE = (1 << 3);
+static const uint32_t PN5180_IRQ_MODE_DETECTED = (1 << 4);
+static const uint32_t PN5180_IRQ_CARD_ACTIVATED = (1 << 5);
+static const uint32_t PN5180_IRQ_STATE_CHANGE = (1 << 6);
+static const uint32_t PN5180_IRQ_RFOFF_DET = (1 << 7);
+static const uint32_t PN5180_IRQ_RFON_DET = (1 << 8);
+static const uint32_t PN5180_IRQ_TX_RFOFF = (1 << 9);
+static const uint32_t PN5180_IRQ_TX_RFON = (1 << 10);
+static const uint32_t PN5180_IRQ_GENERAL_ERROR = (1 << 17);
 
-/// Fires when a tag is removed (last tag_id passed to automation)
-class PN5180TagRemovedTrigger : public Trigger<std::string> {
- public:
-  explicit PN5180TagRemovedTrigger(PN5180Component *parent);
-};
+class PN5180;
 
-// ─── Binary Sensor ───────────────────────────────────────────────────────────
+using PN5180Trigger = Trigger<std::string>;
+using PN5180TagRemovedTrigger = Trigger<std::string>;
 
-/// Binary sensor that tracks a specific known tag UID
-class PN5180BinarySensor : public binary_sensor::BinarySensor {
- public:
-  void set_parent(PN5180Component *parent) { this->parent_ = parent; }
-  void set_uid(const std::string &uid) { this->uid_ = uid; }
-  const std::string &get_uid() const { return this->uid_; }
-
- protected:
-  PN5180Component *parent_{nullptr};
-  std::string uid_;
-};
-
-// ─── Text Sensor ─────────────────────────────────────────────────────────────
-
-/// Text sensor that publishes the last scanned tag UID
-class PN5180TextSensor : public text_sensor::TextSensor {
- public:
-  void set_parent(PN5180Component *parent) { this->parent_ = parent; }
-
- protected:
-  PN5180Component *parent_{nullptr};
-};
-
-// ─── Main Component ──────────────────────────────────────────────────────────
-
-class PN5180Component : public PollingComponent,
-                        public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST,
-                                             spi::CLOCK_POLARITY_LOW,
-                                             spi::CLOCK_PHASE_LEADING,
-                                             spi::DATA_RATE_1MHZ> {
+class PN5180 : public PollingComponent,
+               public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW,
+                                     spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_1MHZ> {
  public:
   void setup() override;
-  void update() override;
   void loop() override;
+  void update() override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::DATA; }
 
-  // ── Pin configuration ──
-  void set_busy_pin(InternalGPIOPin *pin) { this->busy_pin_ = pin; }
-  void set_rst_pin(InternalGPIOPin *pin) { this->rst_pin_ = pin; }
+  void set_cs_pin(GPIOPin *pin) { this->cs_pin_ = pin; }
+  void set_busy_pin(GPIOPin *pin) { this->busy_pin_ = pin; }
+  void set_rst_pin(GPIOPin *pin) { this->rst_pin_ = pin; }
+  void set_tag_ttl(uint32_t ttl) { this->tag_ttl_ = ttl; }
+  void set_emulation_message(const std::string &msg) { this->emulation_message_ = msg; }
 
-  // ── Health check configuration ──
-  void set_health_check_enabled(bool enabled) { this->health_check_enabled_ = enabled; }
-  void set_health_check_interval(uint32_t ms) { this->health_check_interval_ = ms; }
-  void set_auto_reset_on_failure(bool v) { this->auto_reset_on_failure_ = v; }
-  void set_max_failed_checks(uint8_t v) { this->max_failed_checks_ = v; }
-
-  // ── Sensor registration ──
-  void register_tag_sensor(PN5180BinarySensor *sensor) {
-    this->tag_sensors_.push_back(sensor);
-  }
-  void set_text_sensor(PN5180TextSensor *sensor) {
-    this->text_sensor_ = sensor;
-  }
-
-  // ── Callbacks ──
-  void add_on_tag_callback(std::function<void(const std::string &)> &&cb) {
-    this->on_tag_callbacks_.add(std::move(cb));
-  }
-  void add_on_tag_removed_callback(std::function<void(const std::string &)> &&cb) {
-    this->on_tag_removed_callbacks_.add(std::move(cb));
-  }
+  void register_tag(PN5180Trigger *trig) { this->triggers_on_tag_.push_back(trig); }
+  void register_tag_removed(PN5180TagRemovedTrigger *trig) { this->triggers_on_tag_removed_.push_back(trig); }
 
  protected:
-  bool format_uid(const uint8_t *uid, char *buffer, size_t buffer_size);
-  bool perform_health_check();
-  void tag_detected_(const std::string &tag_id);
-  void tag_removed_();
-
-  // Hardware
-  InternalGPIOPin *busy_pin_{nullptr};
-  InternalGPIOPin *rst_pin_{nullptr};
-  PN5180ISO15693 *pn5180_{nullptr};
-
-  // Tag state
-  std::string current_tag_id_{""};
-  bool tag_present_{false};
-
-  // Binary sensors for known tags
-  std::vector<PN5180BinarySensor *> tag_sensors_;
-
-  // Text sensor for last scanned tag
-  PN5180TextSensor *text_sensor_{nullptr};
-
-  // Health check state
-  bool health_check_enabled_{true};
-  uint32_t health_check_interval_{60000};
-  uint32_t last_health_check_{0};
-  uint8_t consecutive_failures_{0};
-  uint8_t max_failed_checks_{3};
-  bool auto_reset_on_failure_{true};
-  bool health_status_{true};
-
-  // Callbacks
-  CallbackManager<void(const std::string &)> on_tag_callbacks_;
-  CallbackManager<void(const std::string &)> on_tag_removed_callbacks_;
+  // Hardware control
+  bool reset();
+  bool wait_busy();
+  
+  // SPI Commands
+  bool write_register(uint32_t reg, uint32_t value);
+  bool read_register(uint32_t reg, uint32_t &value);
+  bool write_eeprom(uint8_t addr, uint8_t value);
+  bool read_eeprom(uint8_t addr, uint8_t &value);
+  bool load_rf_config(uint8_t tx_config, uint8_t rx_config);
+  bool rf_on();
+  bool rf_off();
+  bool send_data(const uint8_t *data, uint8_t len);
+  bool read_data(uint8_t *data, uint8_t &len);
+  
+  // NFC Operations
+  bool read_version();
+  bool configure_iso14443a();
+  bool inventory_iso14443a(std::vector<uint8_t> &uid);
+  bool process_tag_scan();
+  
+  // Helper functions
+  std::string format_uid(const std::vector<uint8_t> &uid);
+  
+  GPIOPin *cs_pin_{nullptr};
+  GPIOPin *busy_pin_{nullptr};
+  GPIOPin *rst_pin_{nullptr};
+  
+  uint32_t tag_ttl_{1000};
+  std::string emulation_message_{};
+  
+  std::vector<PN5180Trigger *> triggers_on_tag_;
+  std::vector<PN5180TagRemovedTrigger *> triggers_on_tag_removed_;
+  
+  std::map<std::string, uint32_t> current_tags_;
+  std::string last_tag_uid_{};
+  
+  enum State {
+    STATE_NOT_INITIALIZED,
+    STATE_READY,
+    STATE_SCANNING,
+  } state_{STATE_NOT_INITIALIZED};
 };
 
 }  // namespace pn5180
