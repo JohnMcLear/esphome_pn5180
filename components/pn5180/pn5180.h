@@ -66,7 +66,6 @@ class PN5180 : public PollingComponent,
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::DATA; }
 
-  void set_cs_pin(GPIOPin *pin) { this->cs_pin_ = pin; }
   void set_busy_pin(GPIOPin *pin) { this->busy_pin_ = pin; }
   void set_rst_pin(GPIOPin *pin) { this->rst_pin_ = pin; }
   void set_tag_ttl(uint32_t ttl) { this->tag_ttl_ = ttl; }
@@ -100,7 +99,6 @@ class PN5180 : public PollingComponent,
   // Helper functions
   std::string format_uid(const std::vector<uint8_t> &uid);
   
-  GPIOPin *cs_pin_{nullptr};
   GPIOPin *busy_pin_{nullptr};
   GPIOPin *rst_pin_{nullptr};
   

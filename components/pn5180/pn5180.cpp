@@ -9,20 +9,11 @@ static const char *const TAG = "pn5180";
 
 void PN5180::setup() {
   ESP_LOGCONFIG(TAG, "Setting up PN5180...");
-  
-  // Initialize pins
-  ESP_LOGD(TAG, "Initializing CS pin...");
-  this->cs_pin_->setup();
-  this->cs_pin_->digital_write(true);
-  ESP_LOGD(TAG, "CS pin set HIGH");
-  
   ESP_LOGD(TAG, "Initializing BUSY pin...");
   this->busy_pin_->setup();
   ESP_LOGD(TAG, "BUSY pin state: %d", this->busy_pin_->digital_read());
   
   ESP_LOGD(TAG, "Initializing RST pin...");
-  this->rst_pin_->setup();
-  this->rst_pin_->digital_write(true);
   ESP_LOGD(TAG, "RST pin set HIGH");
   
   ESP_LOGD(TAG, "Setting up SPI...");
@@ -89,7 +80,6 @@ void PN5180::update() {
 
 void PN5180::dump_config() {
   ESP_LOGCONFIG(TAG, "PN5180:");
-  LOG_PIN("  CS Pin: ", this->cs_pin_);
   LOG_PIN("  BUSY Pin: ", this->busy_pin_);
   LOG_PIN("  RST Pin: ", this->rst_pin_);
   ESP_LOGCONFIG(TAG, "  Tag TTL: %u ms", this->tag_ttl_);
@@ -153,10 +143,7 @@ bool PN5180::write_register(uint32_t reg, uint32_t value) {
   
   this->enable();
   this->write_byte(PN5180_CMD_WRITE_REGISTER);
-  this->write_byte(reg & 0xFF);
-  this->write_byte((reg >> 8) & 0xFF);
-  this->write_byte((reg >> 16) & 0xFF);
-  this->write_byte((reg >> 24) & 0xFF);
+  this->write_byte(reg & 0xFF);  // just 1 byte for address
   this->write_byte(value & 0xFF);
   this->write_byte((value >> 8) & 0xFF);
   this->write_byte((value >> 16) & 0xFF);
@@ -175,10 +162,11 @@ bool PN5180::read_register(uint32_t reg, uint32_t &value) {
   // Send read command
   this->enable();
   this->write_byte(PN5180_CMD_READ_REGISTER);
-  this->write_byte(reg & 0xFF);
-  this->write_byte((reg >> 8) & 0xFF);
-  this->write_byte((reg >> 16) & 0xFF);
-  this->write_byte((reg >> 24) & 0xFF);
+  this->write_byte(reg & 0xFF);  // just 1 byte for address
+  this->write_byte(value & 0xFF);
+  this->write_byte((value >> 8) & 0xFF);
+  this->write_byte((value >> 16) & 0xFF);
+  this->write_byte((value >> 24) & 0xFF);
   this->disable();
   
   if (!this->wait_busy()) {
@@ -291,7 +279,7 @@ bool PN5180::send_data(const uint8_t *data, uint8_t len) {
   
   this->enable();
   this->write_byte(PN5180_CMD_SEND_DATA);
-  this->write_byte(len);
+  this->write_byte(0x00);  // 0 = all 8 bits of last byte valid
   this->write_array(data, len);
   this->disable();
   
