@@ -44,10 +44,10 @@ pn5180:
           format: "Tag removed: %s"
           args: ['tag_id.c_str()']
 
-binary_sensor:
-  - platform: pn5180
-    name: "Test Badge"
-    uid: "E0 07 01 23 45 67 89 AB"
+#binary_sensor:
+#  - platform: pn5180
+#    name: "Test Badge"
+#    uid: "E0 07 01 23 45 67 89 AB"
 
 text_sensor:
   - platform: pn5180
