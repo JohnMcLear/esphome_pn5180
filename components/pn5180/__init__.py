@@ -117,17 +117,15 @@ TEXT_SENSOR_SCHEMA = text_sensor.text_sensor_schema(PN5180TextSensor).extend(
 
 
 async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    await spi.register_spi_device(var, config)
+    var = cg.new_Pvariable(config[CONF_ID])       # ← keep this one
+    await cg.register_component(var, config)       # ← keep this one
+    await spi.register_spi_device(var, config)     # ← keep this one
 
     # Auto-pull required libraries — no need to specify in user YAML
     cg.add_library("SPI", None)
     cg.add_library("PN5180_LIBRARY", None, "https://github.com/tueddy/PN5180-Library.git#master")
 
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-    await spi.register_spi_device(var, config)
+    # ← DELETE the three duplicate lines that were here
 
     busy = await cg.gpio_pin_expression(config[CONF_BUSY_PIN])
     cg.add(var.set_busy_pin(busy))
@@ -135,7 +133,6 @@ async def to_code(config):
     rst = await cg.gpio_pin_expression(config[CONF_RST_PIN])
     cg.add(var.set_rst_pin(rst))
 
-    # Health check
     cg.add(var.set_health_check_enabled(config[CONF_HEALTH_CHECK_ENABLED]))
     cg.add(var.set_health_check_interval(
         config[CONF_HEALTH_CHECK_INTERVAL].total_milliseconds
@@ -143,12 +140,11 @@ async def to_code(config):
     cg.add(var.set_auto_reset_on_failure(config[CONF_AUTO_RESET_ON_FAILURE]))
     cg.add(var.set_max_failed_checks(config[CONF_MAX_FAILED_CHECKS]))
 
-    # on_tag trigger
     for conf in config.get(CONF_ON_TAG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [(cg.std_string, "tag_id")], conf)
 
-    # on_tag_removed trigger
     for conf in config.get(CONF_ON_TAG_REMOVED, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(trigger, [(cg.std_string, "tag_id")], conf)
+
