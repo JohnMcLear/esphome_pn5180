@@ -1,3 +1,5 @@
+# ALPHA: NOT TESTED WITH WORKING HARDWARE YET
+
 # ESPHome PN5180 Component
 
 An ESPHome external component for the PN5180 NFC/RFID reader from NXP Semiconductors.

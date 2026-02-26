@@ -12,23 +12,17 @@ void PN5180::setup() {
   this->busy_pin_->setup();
   this->rst_pin_->setup();
   this->rst_pin_->digital_write(true);
-  
   this->spi_setup();
-  
   if (!this->reset()) {
     ESP_LOGE(TAG, "Failed to reset PN5180");
     this->mark_failed();
     return;
   }
-  
-  delay(50);
-  
   if (!this->read_version()) {
     ESP_LOGE(TAG, "Failed to read PN5180 version");
     this->mark_failed();
     return;
   }
-  
   this->rf_off();
   this->state_ = STATE_READY;
 }
@@ -37,7 +31,6 @@ void PN5180::loop() {}
 
 void PN5180::update() {
   if (this->state_ != STATE_READY) return;
-  
   uint32_t now = millis();
   auto it = this->current_tags_.begin();
   while (it != this->current_tags_.end()) {
@@ -49,7 +42,6 @@ void PN5180::update() {
       ++it;
     }
   }
-  
   this->process_tag_scan();
 }
 
@@ -62,123 +54,147 @@ void PN5180::dump_config() {
 
 bool PN5180::reset() {
   this->rst_pin_->digital_write(false);
-  delay(10);
+  delay(1);
   this->rst_pin_->digital_write(true);
   delay(10);
+  uint32_t irq;
+  uint32_t start = millis();
+  while (millis() - start < 500) {
+    if (this->read_register(PN5180_REG_IRQ_STATUS, irq)) {
+      if (irq & PN5180_IRQ_IDLE) break;
+    }
+    delay(1);
+  }
   this->write_register(PN5180_REG_IRQ_CLEAR, 0xFFFFFFFF);
-  return this->wait_busy();
+  return true;
 }
 
-bool PN5180::wait_busy() {
+bool PN5180::wait_busy(bool level, uint32_t timeout_ms) {
   uint32_t start = millis();
-  while (this->busy_pin_->digital_read()) {
-    if (millis() - start > 100) return false;
-    delay(1);
+  while (this->busy_pin_->digital_read() != level) {
+    if (millis() - start > timeout_ms) return false;
+    yield();
   }
   return true;
 }
 
-bool PN5180::write_register(uint32_t reg, uint32_t value) {
-  if (!this->wait_busy()) return false;
+bool PN5180::transceive(const uint8_t *send_buf, size_t send_len, uint8_t *recv_buf, size_t recv_len) {
+  if (!this->wait_busy(false)) return false;
   this->enable();
-  this->transfer_byte(PN5180_CMD_WRITE_REGISTER);
-  this->transfer_byte(reg & 0xFF);
-  this->transfer_byte(value & 0xFF);
-  this->transfer_byte((value >> 8) & 0xFF);
-  this->transfer_byte((value >> 16) & 0xFF);
-  this->transfer_byte((value >> 24) & 0xFF);
-  this->disable();
   delayMicroseconds(10);
+  for (size_t i = 0; i < send_len; i++) this->transfer_byte(send_buf[i]);
+  this->wait_busy(true);
+  this->disable();
+  if (!this->wait_busy(false)) return false;
+  if (recv_buf == nullptr || recv_len == 0) return true;
+  this->enable();
+  delayMicroseconds(10);
+  for (size_t i = 0; i < recv_len; i++) recv_buf[i] = this->transfer_byte(0x00);
+  this->wait_busy(true);
+  this->disable();
+  this->wait_busy(false);
   return true;
 }
 
+bool PN5180::write_register(uint32_t reg, uint32_t value) {
+  uint8_t buf[6];
+  buf[0] = PN5180_CMD_WRITE_REGISTER;
+  buf[1] = reg & 0xFF;
+  buf[2] = value & 0xFF;
+  buf[3] = (value >> 8) & 0xFF;
+  buf[4] = (value >> 16) & 0xFF;
+  buf[5] = (value >> 24) & 0xFF;
+  return this->transceive(buf, 6);
+}
+
+bool PN5180::write_register_or_mask(uint32_t reg, uint32_t mask) {
+  uint8_t buf[6];
+  buf[0] = PN5180_CMD_WRITE_REGISTER_OR_MASK;
+  buf[1] = reg & 0xFF;
+  buf[2] = mask & 0xFF;
+  buf[3] = (mask >> 8) & 0xFF;
+  buf[4] = (mask >> 16) & 0xFF;
+  buf[5] = (mask >> 24) & 0xFF;
+  return this->transceive(buf, 6);
+}
+
+bool PN5180::write_register_and_mask(uint32_t reg, uint32_t mask) {
+  uint8_t buf[6];
+  buf[0] = PN5180_CMD_WRITE_REGISTER_AND_MASK;
+  buf[1] = reg & 0xFF;
+  buf[2] = mask & 0xFF;
+  buf[3] = (mask >> 8) & 0xFF;
+  buf[4] = (mask >> 16) & 0xFF;
+  buf[5] = (mask >> 24) & 0xFF;
+  return this->transceive(buf, 6);
+}
+
 bool PN5180::read_register(uint32_t reg, uint32_t &value) {
-  if (!this->wait_busy()) return false;
-  this->enable();
-  this->transfer_byte(PN5180_CMD_READ_REGISTER);
-  this->transfer_byte(reg & 0xFF);
-  this->disable();
-  if (!this->wait_busy()) return false;
-  this->enable();
-  uint8_t b0 = this->transfer_byte(0x00);
-  uint8_t b1 = this->transfer_byte(0x00);
-  uint8_t b2 = this->transfer_byte(0x00);
-  uint8_t b3 = this->transfer_byte(0x00);
-  this->disable();
-  value = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-  delayMicroseconds(10);
+  uint8_t cmd[2] = { PN5180_CMD_READ_REGISTER, (uint8_t)(reg & 0xFF) };
+  uint8_t resp[4];
+  if (!this->transceive(cmd, 2, resp, 4)) return false;
+  value = resp[0] | (resp[1] << 8) | (resp[2] << 16) | (resp[3] << 24);
   return (value != 0xFFFFFFFF);
 }
 
 bool PN5180::read_eeprom(uint8_t addr, uint8_t &value) {
-  if (!this->wait_busy()) return false;
-  this->enable();
-  this->transfer_byte(PN5180_CMD_READ_EEPROM);
-  this->transfer_byte(addr);
-  this->transfer_byte(0x01);
-  this->disable();
-  if (!this->wait_busy()) return false;
-  this->enable();
-  value = this->transfer_byte(0x00);
-  this->disable();
-  delayMicroseconds(10);
-  return true;
+  uint8_t cmd[3] = { PN5180_CMD_READ_EEPROM, addr, 0x01 };
+  return this->transceive(cmd, 3, &value, 1);
 }
 
 bool PN5180::load_rf_config(uint8_t tx_config, uint8_t rx_config) {
-  if (!this->wait_busy()) return false;
-  this->enable();
-  this->transfer_byte(PN5180_CMD_LOAD_RF_CONFIG);
-  this->transfer_byte(tx_config);
-  this->transfer_byte(rx_config);
-  this->disable();
-  delay(5);
-  return this->wait_busy();
+  uint8_t cmd[3] = { PN5180_CMD_LOAD_RF_CONFIG, tx_config, rx_config };
+  return this->transceive(cmd, 3);
 }
 
 bool PN5180::rf_on() {
-  if (!this->wait_busy()) return false;
-  this->enable();
-  this->transfer_byte(PN5180_CMD_RF_ON);
-  this->disable();
-  delay(10);
-  return this->wait_busy();
+  uint8_t cmd[2] = { PN5180_CMD_RF_ON, 0x00 };
+  if (!this->transceive(cmd, 2)) return false;
+  uint32_t irq;
+  uint32_t start = millis();
+  while (millis() - start < 100) {
+    if (this->read_register(PN5180_REG_IRQ_STATUS, irq)) {
+      if (irq & PN5180_IRQ_RF_ON_DET) break;
+    }
+    delay(1);
+  }
+  this->write_register(PN5180_REG_IRQ_CLEAR, PN5180_IRQ_RF_ON_DET);
+  return true;
 }
 
 bool PN5180::rf_off() {
-  if (!this->wait_busy()) return false;
-  this->enable();
-  this->transfer_byte(PN5180_CMD_RF_OFF);
-  this->disable();
-  delay(10);
-  return this->wait_busy();
+  uint8_t cmd[2] = { PN5180_CMD_RF_OFF, 0x00 };
+  if (!this->transceive(cmd, 2)) return false;
+  uint32_t irq;
+  uint32_t start = millis();
+  while (millis() - start < 100) {
+    if (this->read_register(PN5180_REG_IRQ_STATUS, irq)) {
+      if (irq & PN5180_IRQ_RF_OFF_DET) break;
+    }
+    delay(1);
+  }
+  this->write_register(PN5180_REG_IRQ_CLEAR, PN5180_IRQ_RF_OFF_DET);
+  return true;
 }
 
-bool PN5180::send_data(const uint8_t *data, uint8_t len) {
-  if (!this->wait_busy()) return false;
-  this->enable();
-  this->transfer_byte(PN5180_CMD_SEND_DATA);
-  this->transfer_byte(0x00);
-  for(uint8_t i=0; i<len; i++) this->transfer_byte(data[i]);
-  this->disable();
-  delayMicroseconds(10);
-  return true;
+bool PN5180::send_data(const uint8_t *data, uint8_t len, uint8_t valid_bits) {
+  this->write_register_and_mask(PN5180_REG_SYSTEM_CONFIG, 0xfffffff8);
+  this->write_register_or_mask(PN5180_REG_SYSTEM_CONFIG, 0x00000003);
+  uint8_t buf[len + 2];
+  buf[0] = PN5180_CMD_SEND_DATA;
+  buf[1] = valid_bits;
+  memcpy(buf + 2, data, len);
+  return this->transceive(buf, len + 2);
 }
 
 bool PN5180::read_data(uint8_t *data, uint8_t &len) {
   uint32_t rx_status;
   if (!this->read_register(PN5180_REG_RX_STATUS, rx_status)) return false;
-  uint8_t rx_len = rx_status & 0x1FF;
-  if (rx_len == 0) { len = 0; return true; }
-  this->enable();
-  this->transfer_byte(PN5180_CMD_READ_DATA);
-  this->disable();
-  if (!this->wait_busy()) return false;
-  this->enable();
-  for (uint8_t i = 0; i < rx_len && i < len; i++) data[i] = this->transfer_byte(0x00);
-  this->disable();
+  uint16_t rx_len = rx_status & 0x1FF;
+  if (rx_len == 0 || rx_len == 0x1FF) { len = 0; return false; }
+  uint8_t cmd[2] = { PN5180_CMD_READ_DATA, 0x00 };
+  if (!this->transceive(cmd, 2, data, rx_len)) return false;
   len = rx_len;
-  delayMicroseconds(10);
   return true;
 }
 
@@ -190,23 +206,14 @@ bool PN5180::read_version() {
 }
 
 bool PN5180::configure_iso14443a() {
-  this->write_register(PN5180_REG_IRQ_CLEAR, 0xFFFFFFFF);
-  if (!this->load_rf_config(0x00, 0x00)) return false;
-  if (!this->rf_on()) return false;
-  delay(10);
   return true;
 }
 
 bool PN5180::inventory_iso14443a(std::vector<uint8_t> &uid) {
-  this->write_register(PN5180_REG_IRQ_CLEAR, 0xFFFFFFFF);
-  this->write_register(PN5180_REG_TRANSCEIVE_CONTROL, 0x07);
-  this->enable();
-  this->transfer_byte(PN5180_CMD_SEND_DATA);
-  this->transfer_byte(0x00);
-  this->transfer_byte(0x26); 
-  this->disable();
+  uint8_t reqa = 0x26;
+  if (!this->send_data(&reqa, 1, 0x07)) return false;
   uint32_t irq = 0, start = millis();
-  while (millis() - start < 20) {
+  while (millis() - start < 50) {
     if (this->read_register(PN5180_REG_IRQ_STATUS, irq)) {
       if (irq & (PN5180_IRQ_RX | PN5180_IRQ_GENERAL_ERROR)) break;
     }
@@ -217,11 +224,10 @@ bool PN5180::inventory_iso14443a(std::vector<uint8_t> &uid) {
   if (!this->read_data(atqa, atqa_len)) return false;
   ESP_LOGI(TAG, "Tag found! ATQA: %02X %02X", atqa[0], atqa[1]);
   this->write_register(PN5180_REG_IRQ_CLEAR, 0xFFFFFFFF);
-  this->write_register(PN5180_REG_TRANSCEIVE_CONTROL, 0x00); 
   uint8_t anticoll[] = {0x93, 0x20};
-  this->send_data(anticoll, 2);
+  this->send_data(anticoll, 2, 0); 
   start = millis();
-  while (millis() - start < 20) {
+  while (millis() - start < 50) {
     if (this->read_register(PN5180_REG_IRQ_STATUS, irq)) {
       if (irq & (PN5180_IRQ_RX | PN5180_IRQ_GENERAL_ERROR)) break;
     }
@@ -229,7 +235,7 @@ bool PN5180::inventory_iso14443a(std::vector<uint8_t> &uid) {
   }
   if (!(irq & PN5180_IRQ_RX)) return false;
   uint8_t uid_data[10], uid_len = 10;
-  if (this->read_data(uid_data, uid_len) && uid_len >= 4) {
+  if (this->read_data(uid_data, uid_len) && uid_len >= 5) {
     uid.assign(uid_data, uid_data + 4);
     return true;
   }
@@ -237,18 +243,24 @@ bool PN5180::inventory_iso14443a(std::vector<uint8_t> &uid) {
 }
 
 bool PN5180::process_tag_scan() {
-  this->reset(); 
-  if (!this->configure_iso14443a()) return false;
-  std::vector<uint8_t> uid;
-  if (this->inventory_iso14443a(uid)) {
-    std::string uid_str = this->format_uid(uid);
-    if (this->current_tags_.find(uid_str) == this->current_tags_.end()) {
-      ESP_LOGI(TAG, "New tag: %s", uid_str.c_str());
-      for (auto *trig : this->triggers_on_tag_) trig->trigger(uid_str);
+  for (uint8_t i = 0; i < 0x08; i++) { // Brute-force first 8 protocols
+    this->reset();
+    if (!this->load_rf_config(i, i | 0x80)) continue;
+    if (!this->rf_on()) continue;
+    delay(20);
+    std::vector<uint8_t> uid;
+    if (this->inventory_iso14443a(uid)) {
+      std::string uid_str = this->format_uid(uid);
+      if (this->current_tags_.find(uid_str) == this->current_tags_.end()) {
+        ESP_LOGI(TAG, "New tag (Idx %02X): %s", i, uid_str.c_str());
+        for (auto *trig : this->triggers_on_tag_) trig->trigger(uid_str);
+      }
+      this->current_tags_[uid_str] = millis();
+      this->rf_off();
+      return true;
     }
-    this->current_tags_[uid_str] = millis();
+    this->rf_off();
   }
-  this->rf_off();
   return true;
 }
 
