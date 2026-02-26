@@ -17,21 +17,6 @@ An ESPHome external component for the PN5180 NFC/RFID reader from NXP Semiconduc
 - ESP32 (tested on ESP32-C6)
 - SPI connection with CS, BUSY, and RST pins
 
-## Wiring
-
-| PN5180 Pin | ESP32 Pin | Description |
-|------------|-----------|-------------|
-| VCC | 3.3V | Power supply (3.3V) |
-| GND | GND | Ground |
-| NSS (CS) | GPIO22 | SPI Chip Select |
-| MOSI | GPIO15 | SPI Master Out Slave In |
-| MISO | GPIO23 | SPI Master In Slave Out |
-| SCK | GPIO20 | SPI Clock |
-| BUSY | GPIO21 | Busy signal (output from PN5180) |
-| RST | GPIO18 | Reset (active low) |
-
-**Note:** The PN5180 operates at 3.3V logic levels. If using a 5V microcontroller, use level shifters on the SPI lines, NSS, and RST pins.
-
 ## Installation
 
 Add the external component to your ESPHome configuration:
@@ -49,7 +34,7 @@ Or from GitHub (once published):
 
 ```yaml
 external_components:
-  - source: github://yourusername/esphome_pn5180
+  - source: github://JohnMcLear/esphome_pn5180
     components: [pn5180]
     refresh: 1d
 ```

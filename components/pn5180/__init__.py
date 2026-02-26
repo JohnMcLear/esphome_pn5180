@@ -8,7 +8,7 @@ from esphome.const import (
     CONF_TRIGGER_ID,
 )
 
-CODEOWNERS = ["@yourusername"]
+CODEOWNERS = ["@JohnMcLear"]
 DEPENDENCIES = ["spi"]
 AUTO_LOAD = []
 MULTI_CONF = True
