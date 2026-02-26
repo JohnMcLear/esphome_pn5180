@@ -1,0 +1,37 @@
+esphome:
+  name: pn5180relay
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+    
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [pn5180]
+    refresh: 0s
+
+# WiFi disabled for power stability
+# wifi:
+#   ssid: "USRF"
+#   password: "0011pat8mak8"
+
+logger:
+  level: VERY_VERBOSE
+  hardware_uart: USB_SERIAL_JTAG
+
+spi:
+  clk_pin: GPIO20
+  miso_pin: GPIO15
+  mosi_pin: GPIO23
+
+pn5180:
+  cs_pin: GPIO22
+  busy_pin: GPIO21
+  rst_pin: GPIO18
+  on_tag:
+    then:
+      - logger.log: "tag detected"
